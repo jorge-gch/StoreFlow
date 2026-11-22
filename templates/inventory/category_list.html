@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Categorías de Productos - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <h3 class="fw-bold mb-1 text-dark">
+                        <i class="bi bi-tags text-primary me-2"></i> Categorías de Productos
+                    </h3>
+                    <p class="text-muted mb-0">Organiza y agrupa los productos de tu tienda.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'inventory:product_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-boxes me-1"></i> Ir a Productos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Formulario para Nueva Categoría (solo admin) -->
+    {% if user.profile.is_admin %}
+        <div class="col-12 col-lg-4">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold text-dark mb-3">
+                    <i class="bi bi-plus-circle text-primary me-2"></i> Nueva Categoría
+                </h5>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold small text-secondary">
+                            Nombre de la Categoría <span class="text-danger">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold small text-secondary">
+                            Descripción
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        {{ form.is_active }}
+                        <label class="form-check-label fw-semibold small text-secondary" for="{{ form.is_active.id_for_label }}">
+                            Categoría Activa
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i> Guardar Categoría
+                    </button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Listado de Categorías -->
+    <div class="col-12 {% if user.profile.is_admin %}col-lg-8{% endif %}">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h5 class="fw-bold text-dark mb-0">Categorías Registradas</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Descripción</th>
+                                <th class="text-center">Total Productos</th>
+                                <th class="text-center">Estado</th>
+                                {% if user.profile.is_admin %}
+                                    <th class="text-end">Acciones</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in categories %}
+                                <tr>
+                                    <td class="fw-bold text-dark">{{ cat.name }}</td>
+                                    <td class="text-muted small">{{ cat.description|default:"-" }}</td>
+                                    <td class="text-center">
+                                        <a href="{% url 'inventory:product_list' %}?category={{ cat.id }}" class="badge bg-light text-primary border text-decoration-none">
+                                            {{ cat.total_products }} productos
+                                        </a>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if cat.is_active %}
+                                            <span class="badge bg-success-subtle text-success">Activa</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactiva</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if user.profile.is_admin %}
+                                        <td class="text-end">
+                                            <a href="{% url 'inventory:category_update' cat.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        No hay categorías registradas aún.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

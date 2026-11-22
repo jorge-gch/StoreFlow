@@ -1,0 +1,156 @@
+/* ==========================================================================
+   StoreFlow - Estilos Base y Diseño del Sistema
+   ========================================================================== */
+
+:root {
+    --sf-sidebar-width: 260px;
+    --sf-sidebar-collapsed-width: 0px;
+    --sf-sidebar-bg: #1e293b;
+    --sf-sidebar-hover: #334155;
+    --sf-sidebar-active: #0d6efd;
+    --sf-primary: #0d6efd;
+    --sf-bg-body: #f8fafc;
+    --sf-border-color: #e2e8f0;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--sf-bg-body);
+    color: #334155;
+    overflow-x: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Layout Principal: Sidebar + Main
+   -------------------------------------------------------------------------- */
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.app-sidebar {
+    width: var(--sf-sidebar-width);
+    min-width: var(--sf-sidebar-width);
+    transition: all 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    z-index: 1040;
+    min-height: 100vh;
+}
+
+.app-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Sidebar Colapsado (Desktop & Mobile) */
+.sidebar-collapsed .app-sidebar {
+    margin-left: calc(-1 * var(--sf-sidebar-width));
+}
+
+@media (max-width: 991.98px) {
+    .app-sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        margin-left: calc(-1 * var(--sf-sidebar-width));
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .sidebar-open .app-sidebar {
+        margin-left: 0;
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1035;
+        display: none;
+    }
+
+    .sidebar-open .sidebar-overlay {
+        display: block;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar Links y Elementos
+   -------------------------------------------------------------------------- */
+.sidebar-category {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+}
+
+.app-sidebar .nav-link {
+    color: #94a3b8;
+    font-weight: 500;
+    font-size: 0.92rem;
+    transition: all 0.2s ease;
+}
+
+.app-sidebar .nav-link:hover {
+    color: #ffffff;
+    background-color: var(--sf-sidebar-hover);
+}
+
+.app-sidebar .nav-link.active {
+    color: #ffffff;
+    background-color: var(--sf-sidebar-active);
+}
+
+/* --------------------------------------------------------------------------
+   Header / Navbar
+   -------------------------------------------------------------------------- */
+.app-header {
+    height: 64px;
+    z-index: 1020;
+    background-color: #ffffff;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Cards y Componentes
+   -------------------------------------------------------------------------- */
+.card {
+    border-color: var(--sf-border-color);
+    border-radius: 0.65rem;
+    background-color: #ffffff;
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom-color: var(--sf-border-color);
+}
+
+.table th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.badge {
+    font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+.app-footer {
+    height: 52px;
+}

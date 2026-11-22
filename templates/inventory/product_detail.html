@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.name }} - Detalle{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-light text-dark border font-monospace">{{ product.sku }}</span>
+                        <span class="badge bg-secondary-subtle text-secondary">{{ product.category.name }}</span>
+                        {% if product.is_active %}
+                            <span class="badge bg-success-subtle text-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger">Inactivo</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">{{ product.name }}</h3>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'inventory:product_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Catálogo
+                    </a>
+                    {% if user.profile.is_admin %}
+                        <button type="button" class="btn btn-warning text-dark" data-bs-toggle="modal" data-bs-target="#stockModal">
+                            <i class="bi bi-arrow-left-right me-1"></i> Entrada / Salida
+                        </button>
+                        <a href="{% url 'inventory:product_update' product.pk %}" class="btn btn-primary">
+                            <i class="bi bi-pencil me-1"></i> Editar
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas de Información Rápida -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <span class="text-muted small fw-semibold text-uppercase">Stock Disponible</span>
+            <h2 class="fw-bold mt-1 mb-0 {% if product.is_low_stock %}text-danger{% else %}text-success{% endif %}">
+                {{ product.stock }}
+            </h2>
+            <small class="text-muted">Mínimo: {{ product.min_stock }} uds</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <span class="text-muted small fw-semibold text-uppercase">Precio de Compra</span>
+            <h2 class="fw-bold mt-1 mb-0 text-muted">${{ product.cost_price|floatformat:2 }}</h2>
+            <small class="text-muted">Costo unitario</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <span class="text-muted small fw-semibold text-uppercase">Precio de Venta</span>
+            <h2 class="fw-bold mt-1 mb-0 text-primary">${{ product.sale_price|floatformat:2 }}</h2>
+            <small class="text-muted">Público</small>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <span class="text-muted small fw-semibold text-uppercase">Margen Estimado</span>
+            <h2 class="fw-bold mt-1 mb-0 text-success">${{ product.profit_margin|floatformat:2 }}</h2>
+            <small class="text-muted">Utilidad bruta unitaria</small>
+        </div>
+    </div>
+</div>
+
+<!-- Descripción y Kardex -->
+<div class="row g-4">
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm p-4 h-100">
+            <h5 class="fw-bold text-dark mb-3">Descripción</h5>
+            <p class="text-muted mb-4">{{ product.description|default:"Sin descripción registrada." }}</p>
+
+            <h6 class="fw-bold text-dark mb-2">Información de Registro</h6>
+            <ul class="list-unstyled text-muted small mb-0">
+                <li class="py-1"><strong>Registrado el:</strong> {{ product.created_at|date:"d/m/Y H:i" }}</li>
+                <li class="py-1"><strong>Última actualización:</strong> {{ product.updated_at|date:"d/m/Y H:i" }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-clock-history text-primary me-2"></i> Historial Reciente de Movimientos
+                </h5>
+                <a href="{% url 'inventory:movement_list' %}?q={{ product.sku }}" class="btn btn-sm btn-outline-secondary">Ver Kardex</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th class="text-center">Cantidad</th>
+                                <th class="text-center">Stock Resultante</th>
+                                <th>Referencia</th>
+                                <th>Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in recent_movements %}
+                                <tr>
+                                    <td class="small">{{ m.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        {% if m.movement_type == 'in' %}
+                                            <span class="badge bg-success-subtle text-success"><i class="bi bi-arrow-down-left me-1"></i>Entrada</span>
+                                        {% elif m.movement_type == 'out' %}
+                                            <span class="badge bg-danger-subtle text-danger"><i class="bi bi-arrow-up-right me-1"></i>Salida</span>
+                                        {% else %}
+                                            <span class="badge bg-warning-subtle text-dark"><i class="bi bi-arrow-left-right me-1"></i>Ajuste</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center fw-bold">{{ m.quantity }}</td>
+                                    <td class="text-center">{{ m.new_stock }}</td>
+                                    <td class="small text-muted">{{ m.reference }}</td>
+                                    <td class="small">{{ m.user.username }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        No hay movimientos registrados para este producto.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Ajustar Stock -->
+{% if user.profile.is_admin %}
+<div class="modal fade" id="stockModal" tabindex="-1" aria-labelledby="stockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'inventory:product_adjust_stock' product.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="stockModalLabel">
+                        <i class="bi bi-arrow-left-right text-primary me-2"></i> Registrar Movimiento de Stock
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Producto: <strong>{{ product.name }}</strong> (Stock actual: {{ product.stock }} uds)</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Tipo de Movimiento</label>
+                        {{ movement_form.movement_type }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Cantidad / Conteo</label>
+                        {{ movement_form.quantity }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Referencia / Motivo</label>
+                        {{ movement_form.reference }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Observaciones adicionales</label>
+                        {{ movement_form.notes }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i> Aplicar Movimiento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
