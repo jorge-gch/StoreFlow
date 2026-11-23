@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ customer.name }} - Ficha de Cliente{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        {% if customer.document_id %}
+                            <span class="badge bg-light text-dark border">{{ customer.document_id }}</span>
+                        {% endif %}
+                        {% if customer.is_active %}
+                            <span class="badge bg-success-subtle text-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger">Inactivo</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">{{ customer.name }}</h3>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'customers:customer_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Directorio
+                    </a>
+                    <a href="{% url 'customers:customer_update' customer.pk %}" class="btn btn-primary">
+                        <i class="bi bi-pencil me-1"></i> Editar Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Información de Contacto -->
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-4 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-person-badge text-primary me-2"></i> Datos de Contacto</h5>
+            <ul class="list-unstyled text-muted small mb-0">
+                <li class="py-2 border-bottom">
+                    <strong>Teléfono:</strong> 
+                    <span class="text-dark float-end"><a href="tel:{{ customer.phone }}" class="text-decoration-none text-dark">{{ customer.phone }}</a></span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Correo:</strong> 
+                    <span class="text-dark float-end">{{ customer.email|default:"No registrado" }}</span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Dirección:</strong> 
+                    <span class="text-dark float-end">{{ customer.address|default:"No registrada" }}</span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Fecha Registro:</strong> 
+                    <span class="text-dark float-end">{{ customer.created_at|date:"d/m/Y" }}</span>
+                </li>
+            </ul>
+
+            {% if customer.notes %}
+                <div class="mt-3 p-3 bg-light rounded-3 small">
+                    <strong class="text-dark d-block mb-1">Notas / Observaciones:</strong>
+                    {{ customer.notes }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Resumen Financiero y de Compras -->
+    <div class="col-12 col-md-8">
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <div class="card border-0 shadow-sm p-3 text-center">
+                    <span class="text-muted small fw-semibold text-uppercase">Compras Realizadas</span>
+                    <h3 class="fw-bold text-primary mt-1 mb-0">{{ customer.total_purchases }}</h3>
+                    <small class="text-muted">Facturas cerradas</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm p-3 text-center">
+                    <span class="text-muted small fw-semibold text-uppercase">Saldo Pendiente</span>
+                    <h3 class="fw-bold mt-1 mb-0 {% if customer.total_debt > 0 %}text-danger{% else %}text-success{% endif %}">
+                        ${{ customer.total_debt|floatformat:2 }}
+                    </h3>
+                    <small class="text-muted">Cuentas por cobrar</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deudas y Créditos Activos -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-wallet2 text-danger me-2"></i> Créditos y Cuentas por Cobrar</h6>
+                <span class="badge bg-light text-muted border">Módulo Deudas (Fase 7)</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Factura / Venta</th>
+                                <th>Fecha Venta</th>
+                                <th>Total Facturado</th>
+                                <th>Saldo Pendiente</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for debt in debts %}
+                                <tr>
+                                    <td>#{{ debt.sale.invoice_number }}</td>
+                                    <td>{{ debt.created_at|date:"d/m/Y" }}</td>
+                                    <td>${{ debt.total_amount|floatformat:2 }}</td>
+                                    <td class="fw-bold text-danger">${{ debt.pending_balance|floatformat:2 }}</td>
+                                    <td><span class="badge bg-warning text-dark">Pendiente</span></td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="bi bi-shield-check fs-2 d-block mb-1 text-success"></i>
+                                        El cliente no tiene deudas pendientes en este momento.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

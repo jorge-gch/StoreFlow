@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ supplier.name }} - Ficha de Proveedor{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        {% if supplier.tax_id %}
+                            <span class="badge bg-light text-dark border">NIT: {{ supplier.tax_id }}</span>
+                        {% endif %}
+                        {% if supplier.is_active %}
+                            <span class="badge bg-success-subtle text-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger">Inactivo</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">{{ supplier.name }}</h3>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'suppliers:supplier_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Directorio
+                    </a>
+                    <a href="{% url 'suppliers:supplier_update' supplier.pk %}" class="btn btn-primary">
+                        <i class="bi bi-pencil me-1"></i> Editar Proveedor
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Información Comercial -->
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-4 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-building text-primary me-2"></i> Datos Comerciales</h5>
+            <ul class="list-unstyled text-muted small mb-0">
+                <li class="py-2 border-bottom">
+                    <strong>Contacto:</strong> 
+                    <span class="text-dark float-end">{{ supplier.contact_name|default:"No registrado" }}</span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Teléfono:</strong> 
+                    <span class="text-dark float-end"><a href="tel:{{ supplier.phone }}" class="text-decoration-none text-dark">{{ supplier.phone }}</a></span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Correo:</strong> 
+                    <span class="text-dark float-end">{{ supplier.email|default:"No registrado" }}</span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Dirección:</strong> 
+                    <span class="text-dark float-end">{{ supplier.address|default:"No registrada" }}</span>
+                </li>
+                <li class="py-2 border-bottom">
+                    <strong>Registrado el:</strong> 
+                    <span class="text-dark float-end">{{ supplier.created_at|date:"d/m/Y" }}</span>
+                </li>
+            </ul>
+
+            {% if supplier.notes %}
+                <div class="mt-3 p-3 bg-light rounded-3 small">
+                    <strong class="text-dark d-block mb-1">Términos y Notas:</strong>
+                    {{ supplier.notes }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Resumen Financiero y Compras -->
+    <div class="col-12 col-md-8">
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <div class="card border-0 shadow-sm p-3 text-center">
+                    <span class="text-muted small fw-semibold text-uppercase">Órdenes de Compra</span>
+                    <h3 class="fw-bold text-primary mt-1 mb-0">{{ supplier.total_purchases }}</h3>
+                    <small class="text-muted">Compras recibidas</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm p-3 text-center">
+                    <span class="text-muted small fw-semibold text-uppercase">Saldo por Pagar</span>
+                    <h3 class="fw-bold mt-1 mb-0 {% if supplier.total_debt > 0 %}text-danger{% else %}text-success{% endif %}">
+                        ${{ supplier.total_debt|floatformat:2 }}
+                    </h3>
+                    <small class="text-muted">Obligaciones pendientes</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuentas por Pagar al Proveedor -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-cash-stack text-warning me-2"></i> Obligaciones y Cuentas por Pagar</h6>
+                <span class="badge bg-light text-muted border">Módulo Compras & Pagos (Fase 6 & 7)</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Factura Compra</th>
+                                <th>Fecha Emisión</th>
+                                <th>Total Facturado</th>
+                                <th>Saldo Pendiente</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for debt in debts %}
+                                <tr>
+                                    <td>#{{ debt.purchase.invoice_number }}</td>
+                                    <td>{{ debt.created_at|date:"d/m/Y" }}</td>
+                                    <td>${{ debt.total_amount|floatformat:2 }}</td>
+                                    <td class="fw-bold text-danger">${{ debt.pending_balance|floatformat:2 }}</td>
+                                    <td><span class="badge bg-warning text-dark">Pendiente</span></td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="bi bi-check-circle-fill fs-2 d-block mb-1 text-success"></i>
+                                        No hay cuentas ni facturas pendientes por pagar a este proveedor.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

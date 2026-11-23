@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}Factura #{{ sale.invoice_number }} - StoreFlow{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printableInvoice, #printableInvoice * {
+            visibility: visible;
+        }
+        #printableInvoice {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 15px;
+            box-shadow: none !important;
+            border: none !important;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4 no-print">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-light text-dark border font-monospace">Factura #{{ sale.invoice_number }}</span>
+                        {% if sale.status == 'completed' %}
+                            <span class="badge bg-success-subtle text-success">Completada</span>
+                        {% else %}
+                            <span class="badge bg-danger">Anulada</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">Detalle de Venta</h3>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'sales:sale_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Historial
+                    </a>
+                    <button type="button" class="btn btn-primary" onclick="window.print();">
+                        <i class="bi bi-printer me-1"></i> Imprimir Factura
+                    </button>
+                    {% if user.profile.is_admin and sale.status == 'completed' %}
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelSaleModal">
+                            <i class="bi bi-x-circle me-1"></i> Anular Venta
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjeta de Factura Imprimible -->
+<div class="row">
+    <div class="col-12 col-lg-8 mx-auto">
+        <div class="card border-0 shadow-sm p-4 p-md-5 bg-white" id="printableInvoice">
+            <!-- Encabezado de Factura -->
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-primary p-2 rounded-2"><i class="bi bi-shop fs-5"></i></span>
+                        <h4 class="fw-bold mb-0 text-dark">StoreFlow</h4>
+                    </div>
+                    <p class="text-muted small mb-0">Sistema de Control y Gestión de Tienda</p>
+                    <p class="text-muted small mb-0">NIT: 900.000.000-1 | Régimen Común</p>
+                    <p class="text-muted small mb-0">Tel: +57 (601) 800-0000 | Ciudad, Colombia</p>
+                </div>
+                <div class="text-end">
+                    <h5 class="fw-bold text-dark mb-1 font-monospace">FACTURA DE VENTA</h5>
+                    <div class="fs-5 fw-bold text-primary mb-1">#{{ sale.invoice_number }}</div>
+                    <div class="small text-muted"><strong>Fecha:</strong> {{ sale.date|date:"d/m/Y H:i:s" }}</div>
+                    <div class="small text-muted"><strong>Atendido por:</strong> {{ sale.user.get_full_name|default:sale.user.username }}</div>
+                </div>
+            </div>
+
+            <!-- Datos del Cliente y Pago -->
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 small">
+                        <strong class="text-secondary text-uppercase d-block mb-1" style="font-size: 0.75rem;">Facturado a:</strong>
+                        <div class="fw-bold text-dark fs-6">{{ sale.customer.name|default:"Consumidor Final" }}</div>
+                        {% if sale.customer %}
+                            <div class="text-muted">Doc / NIT: {{ sale.customer.document_id|default:"-" }}</div>
+                            <div class="text-muted">Tel: {{ sale.customer.phone }}</div>
+                            {% if sale.customer.address %}<div class="text-muted">Dir: {{ sale.customer.address }}</div>{% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 small">
+                        <strong class="text-secondary text-uppercase d-block mb-1" style="font-size: 0.75rem;">Detalles del Pago:</strong>
+                        <div><strong>Método:</strong> <span class="badge bg-secondary-subtle text-secondary">{{ sale.get_payment_method_display }}</span></div>
+                        <div class="mt-1"><strong>Estado:</strong> 
+                            {% if sale.status == 'completed' %}
+                                <span class="badge bg-success-subtle text-success">Pagado / Completado</span>
+                            {% else %}
+                                <span class="badge bg-danger">Anulada</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Si está anulada, mostrar alerta de anulación -->
+            {% if sale.status == 'cancelled' %}
+                <div class="alert alert-danger mb-4">
+                    <div class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> ESTA VENTA FUE ANULADA</div>
+                    <div class="small">Fecha de anulación: {{ sale.cancelled_at|date:"d/m/Y H:i" }}</div>
+                    {% if sale.cancellation_reason %}
+                        <div class="small">Motivo: {{ sale.cancellation_reason }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <!-- Tabla de Ítems Vendidos -->
+            <div class="table-responsive mb-4">
+                <table class="table align-middle">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Cant.</th>
+                            <th>Descripción del Producto</th>
+                            <th>Código SKU</th>
+                            <th class="text-end">Precio Unit.</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td class="fw-bold">{{ item.quantity }}</td>
+                                <td class="fw-semibold text-dark">{{ item.product.name }}</td>
+                                <td><span class="font-monospace small text-muted">{{ item.product.sku }}</span></td>
+                                <td class="text-end text-muted">${{ item.unit_price|floatformat:2 }}</td>
+                                <td class="text-end fw-bold text-dark">${{ item.subtotal|floatformat:2 }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumen Financiero Total -->
+            <div class="row justify-content-end mb-4">
+                <div class="col-12 col-md-5">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Subtotal:</span>
+                            <span class="fw-semibold text-dark">${{ sale.subtotal|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mb-2">
+                            <span>Descuento:</span>
+                            <span class="text-danger">-${{ sale.discount|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between fs-5 fw-bold text-dark pt-2 border-top">
+                            <span>TOTAL NETO:</span>
+                            <span class="text-success">${{ sale.total|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if sale.notes %}
+                <div class="p-3 bg-light rounded-3 small text-muted mb-4">
+                    <strong>Observaciones:</strong> {{ sale.notes }}
+                </div>
+            {% endif %}
+
+            <div class="text-center text-muted small border-top pt-3">
+                <p class="mb-0">¡Gracias por su compra en StoreFlow!</p>
+                <p class="mb-0 text-muted" style="font-size: 0.75rem;">Conserve esta factura como soporte de su compra y garantía.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Anular Venta -->
+{% if user.profile.is_admin and sale.status == 'completed' %}
+<div class="modal fade no-print" id="cancelSaleModal" tabindex="-1" aria-labelledby="cancelSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'sales:sale_cancel' sale.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-danger" id="cancelSaleModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Anular Venta #{{ sale.invoice_number }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-dark">
+                        ¿Confirma que desea anular esta venta? Esta operación es <strong>irreversible</strong> y realizará automáticamente:
+                    </p>
+                    <ul class="small text-muted mb-3">
+                        <li>Cambio de estado a <strong>Anulada</strong>.</li>
+                        <li><strong>Reintegro automático</strong> de las cantidades vendidas al stock de cada producto.</li>
+                        <li>Registro de movimiento en el <strong>Kardex</strong> de inventario.</li>
+                    </ul>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Motivo de la anulación <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" class="form-control" rows="3" placeholder="Ej. Error en cobro, devolución del cliente..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Regresar</button>
+                    <button type="submit" class="btn btn-danger fw-semibold">
+                        <i class="bi bi-x-circle me-1"></i> Confirmar Anulación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

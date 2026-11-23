@@ -126,3 +126,61 @@ class Command(BaseCommand):
                     notes='Sembrado de catálogo inicial.'
                 )
         self.stdout.write(self.style.SUCCESS('Productos y Kardex iniciales creados exitosamente.'))
+
+        # 5. Crear Clientes de Demostración
+        from customers.models import Customer
+        sample_customers = [
+            {
+                'name': 'Consumidor Final',
+                'document_id': '222222222222',
+                'phone': '0000000000',
+                'notes': 'Cliente genérico para ventas al contado'
+            },
+            {
+                'name': 'Ana María Restrepo',
+                'document_id': '1020304050',
+                'phone': '3124567890',
+                'email': 'ana.restrepo@correo.com',
+                'address': 'Carrera 15 # 45-30 Apto 201',
+                'notes': 'Cliente frecuente de barrio. Buen historial crediticio.'
+            },
+            {
+                'name': 'Restaurante Sabor Criollo',
+                'document_id': '900876543-1',
+                'phone': '3209876543',
+                'email': 'pedidos@saborcriollo.com',
+                'address': 'Calle 72 # 11-40',
+                'notes': 'Compras semanales en volumen para cocina.'
+            }
+        ]
+
+        for c_data in sample_customers:
+            Customer.objects.get_or_create(name=c_data['name'], defaults=c_data)
+        self.stdout.write(self.style.SUCCESS('Clientes iniciales creados.'))
+
+        # 6. Crear Proveedores de Demostración
+        from suppliers.models import Supplier
+        sample_suppliers = [
+            {
+                'name': 'Distribuidora Lácteos del Valle S.A.',
+                'contact_name': 'Roberto Martínez',
+                'tax_id': '890123456-1',
+                'phone': '6013456789',
+                'email': 'ventas@lacteosdelvalle.com',
+                'address': 'Zona Industrial Calle 13',
+                'notes': 'Días de entrega: Martes y Jueves. Plazo de pago: 15 días.'
+            },
+            {
+                'name': 'Mayorista de Abarrotes Central',
+                'contact_name': 'Claudia Pineda',
+                'tax_id': '800987654-3',
+                'phone': '3157654321',
+                'email': 'pedidos@centralabarrotes.com',
+                'address': 'Central Mayorista Bodega 4',
+                'notes': 'Descuento del 3% por pago de contado.'
+            }
+        ]
+
+        for s_data in sample_suppliers:
+            Supplier.objects.get_or_create(name=s_data['name'], defaults=s_data)
+        self.stdout.write(self.style.SUCCESS('Proveedores iniciales creados.'))

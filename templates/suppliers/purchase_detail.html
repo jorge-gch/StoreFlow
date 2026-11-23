@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}Compra #{{ purchase.invoice_number }} - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-light text-dark border font-monospace">Compra #{{ purchase.invoice_number }}</span>
+                        {% if purchase.status == 'completed' %}
+                            <span class="badge bg-success-subtle text-success">Recibida</span>
+                        {% else %}
+                            <span class="badge bg-danger">Anulada</span>
+                        {% endif %}
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">Detalle de Compra de Mercancía</h3>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'suppliers:purchase_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Historial de Compras
+                    </a>
+                    {% if user.profile.is_admin and purchase.status == 'completed' %}
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelPurchaseModal">
+                            <i class="bi bi-x-circle me-1"></i> Anular Compra
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-8 mx-auto">
+        <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
+            <!-- Encabezado -->
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+                <div>
+                    <h4 class="fw-bold mb-1 text-dark">StoreFlow</h4>
+                    <span class="text-muted small">Recepción de Mercancía en Inventario</span>
+                    <div class="small text-muted mt-2"><strong>Registrado por:</strong> {{ purchase.user.get_full_name|default:purchase.user.username }}</div>
+                </div>
+                <div class="text-end">
+                    <h5 class="fw-bold text-dark mb-1 font-monospace">ORDEN DE COMPRA</h5>
+                    <div class="fs-5 fw-bold text-primary mb-1">#{{ purchase.invoice_number }}</div>
+                    <div class="small text-muted"><strong>Fecha:</strong> {{ purchase.date|date:"d/m/Y H:i:s" }}</div>
+                    {% if purchase.supplier_invoice %}
+                        <div class="small text-muted"><strong>Factura Proveedor:</strong> {{ purchase.supplier_invoice }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Datos del Proveedor y Pago -->
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 small">
+                        <strong class="text-secondary text-uppercase d-block mb-1" style="font-size: 0.75rem;">Proveedor:</strong>
+                        <div class="fw-bold text-dark fs-6">{{ purchase.supplier.name }}</div>
+                        <div class="text-muted">NIT: {{ purchase.supplier.tax_id|default:"-" }}</div>
+                        <div class="text-muted">Tel: {{ purchase.supplier.phone }}</div>
+                        {% if purchase.supplier.address %}<div class="text-muted">Dir: {{ purchase.supplier.address }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 small">
+                        <strong class="text-secondary text-uppercase d-block mb-1" style="font-size: 0.75rem;">Condición de Compra:</strong>
+                        <div><strong>Método:</strong> <span class="badge bg-secondary-subtle text-secondary">{{ purchase.get_payment_method_display }}</span></div>
+                        <div class="mt-1"><strong>Estado:</strong> 
+                            {% if purchase.status == 'completed' %}
+                                <span class="badge bg-success-subtle text-success">Ingresado al Inventario</span>
+                            {% else %}
+                                <span class="badge bg-danger">Anulada</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if purchase.status == 'cancelled' %}
+                <div class="alert alert-danger mb-4">
+                    <div class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> COMPRA ANULADA</div>
+                    <div class="small">Fecha de anulación: {{ purchase.cancelled_at|date:"d/m/Y H:i" }}</div>
+                    {% if purchase.cancellation_reason %}
+                        <div class="small">Motivo: {{ purchase.cancellation_reason }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <!-- Artículos Comprados -->
+            <div class="table-responsive mb-4">
+                <table class="table align-middle">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Cant.</th>
+                            <th>Producto Comprado</th>
+                            <th>Código SKU</th>
+                            <th class="text-end">Costo Unitario</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td class="fw-bold">{{ item.quantity }}</td>
+                                <td class="fw-semibold text-dark">{{ item.product.name }}</td>
+                                <td><span class="font-monospace small text-muted">{{ item.product.sku }}</span></td>
+                                <td class="text-end text-muted">${{ item.unit_cost|floatformat:2 }}</td>
+                                <td class="text-end fw-bold text-dark">${{ item.subtotal|floatformat:2 }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumen Total -->
+            <div class="row justify-content-end mb-4">
+                <div class="col-12 col-md-5">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <div class="d-flex justify-content-between fs-5 fw-bold text-dark">
+                            <span>TOTAL INVERTIDO:</span>
+                            <span class="text-primary">${{ purchase.total|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if purchase.notes %}
+                <div class="p-3 bg-light rounded-3 small text-muted">
+                    <strong>Observaciones:</strong> {{ purchase.notes }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Anular Compra -->
+{% if user.profile.is_admin and purchase.status == 'completed' %}
+<div class="modal fade" id="cancelPurchaseModal" tabindex="-1" aria-labelledby="cancelPurchaseModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'suppliers:purchase_cancel' purchase.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-danger" id="cancelPurchaseModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Anular Compra #{{ purchase.invoice_number }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-dark">
+                        ¿Confirma que desea anular esta orden de compra? La anulación realizará:
+                    </p>
+                    <ul class="small text-muted mb-3">
+                        <li>Cambio de estado a <strong>Anulada</strong>.</li>
+                        <li><strong>Deducción automática</strong> de las cantidades recibidas del stock de cada producto.</li>
+                        <li>Registro de salida en el <strong>Kardex</strong> de inventario.</li>
+                        <li>Si el stock disponible de algún producto es inferior a la cantidad comprada, la anulación será bloqueada para evitar stock negativo.</li>
+                    </ul>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Motivo de la anulación <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" class="form-control" rows="3" placeholder="Ej. Mercancía averiada, factura errónea..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Regresar</button>
+                    <button type="submit" class="btn btn-danger fw-semibold">
+                        <i class="bi bi-x-circle me-1"></i> Confirmar Anulación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

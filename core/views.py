@@ -83,11 +83,13 @@ def dashboard_view(request):
     except Exception:
         pass
 
+    recent_sales = []
     # Intentar obtener métricas de Sales si el modelo existe
     try:
         from sales.models import Sale
         sales_today_qs = Sale.objects.filter(date__date=today, status='completed')
         metrics['sales_today'] = sales_today_qs.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        recent_sales = list(Sale.objects.select_related('customer').order_by('-date')[:5])
     except Exception:
         pass
 
@@ -127,8 +129,6 @@ def dashboard_view(request):
     for i in range(5, -1, -1):
         m = (current_month - i - 1) % 12 + 1
         months_labels.append(month_names[m - 1])
-
-    recent_sales = []
 
     context = {
         'title': 'Dashboard Principal',

@@ -200,10 +200,10 @@
                 </h5>
             </div>
             <div class="card-body d-flex flex-column justify-content-around gap-2">
-                <a href="#" class="btn btn-outline-success p-3 text-start d-flex align-items-center rounded-3">
+                <a href="{% url 'sales:pos' %}" class="btn btn-outline-success p-3 text-start d-flex align-items-center rounded-3">
                     <i class="bi bi-cart-plus fs-3 me-3"></i>
                     <div>
-                        <div class="fw-bold">Nueva Venta</div>
+                        <div class="fw-bold">Nueva Venta (POS)</div>
                         <small class="text-muted">Abrir punto de venta y registrar salida</small>
                     </div>
                 </a>
@@ -216,7 +216,7 @@
                     </div>
                 </a>
 
-                <a href="#" class="btn btn-outline-info p-3 text-start d-flex align-items-center rounded-3">
+                <a href="{% url 'customers:customer_create' %}" class="btn btn-outline-info p-3 text-start d-flex align-items-center rounded-3">
                     <i class="bi bi-person-plus fs-3 me-3"></i>
                     <div>
                         <div class="fw-bold">Nuevo Cliente</div>

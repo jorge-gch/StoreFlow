@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="fw-bold mb-1 text-dark">
+                        <i class="bi bi-building-add text-primary me-2"></i> {{ title }}
+                    </h3>
+                    <p class="text-muted mb-0">Ingrese los datos comerciales y de facturación del proveedor.</p>
+                </div>
+                <a href="{% url 'suppliers:supplier_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Volver a Proveedores
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-8 mx-auto">
+        <div class="card border-0 shadow-sm p-4">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-8">
+                        <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Razón Social / Proveedor <span class="text-danger">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label for="{{ form.tax_id.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            NIT / Identificación Fiscal
+                        </label>
+                        {{ form.tax_id }}
+                        {% if form.tax_id.errors %}
+                            <div class="text-danger small mt-1">{{ form.tax_id.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="{{ form.contact_name.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Nombre del Contacto / Asesor
+                        </label>
+                        {{ form.contact_name }}
+                        {% if form.contact_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.contact_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="{{ form.phone.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Teléfono de Pedidos <span class="text-danger">*</span>
+                        </label>
+                        {{ form.phone }}
+                        {% if form.phone.errors %}
+                            <div class="text-danger small mt-1">{{ form.phone.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Correo Electrónico
+                        </label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="{{ form.address.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Dirección de Despacho
+                        </label>
+                        {{ form.address }}
+                        {% if form.address.errors %}
+                            <div class="text-danger small mt-1">{{ form.address.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold text-secondary small">
+                            Condiciones Comerciales / Notas de Pago
+                        </label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div class="text-danger small mt-1">{{ form.notes.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch mt-2">
+                            {{ form.is_active }}
+                            <label class="form-check-label fw-semibold text-secondary small" for="{{ form.is_active.id_for_label }}">
+                                Proveedor Activo para Órdenes de Compra
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="{% url 'suppliers:supplier_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i> Guardar Proveedor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -22,13 +22,13 @@
         <div class="sidebar-category text-uppercase text-secondary fw-bold px-3 py-2">Ventas & Stock</div>
         <ul class="nav flex-column mb-2">
             <li class="nav-item">
-                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="#">
+                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="{% url 'sales:pos' %}">
                     <i class="bi bi-cart-plus me-2 fs-5 text-success"></i>
                     <span>Punto de Venta</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="#">
+                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="{% url 'sales:sale_list' %}">
                     <i class="bi bi-receipt me-2 fs-5 text-success"></i>
                     <span>Historial de Ventas</span>
                 </a>
@@ -40,9 +40,9 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="#">
+                <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="{% url 'customers:customer_list' %}">
                     <i class="bi bi-people me-2 fs-5 text-primary"></i>
-                    <span>Clientes & Cobros</span>
+                    <span>Clientes</span>
                 </a>
             </li>
         </ul>
@@ -52,9 +52,15 @@
             <div class="sidebar-category text-uppercase text-secondary fw-bold px-3 py-2">Administración</div>
             <ul class="nav flex-column mb-2">
                 <li class="nav-item">
-                    <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="#">
+                    <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="{% url 'suppliers:supplier_list' %}">
+                        <i class="bi bi-building me-2 fs-5 text-secondary"></i>
+                        <span>Proveedores</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white-50 d-flex align-items-center py-2 px-3 rounded" href="{% url 'suppliers:purchase_list' %}">
                         <i class="bi bi-truck me-2 fs-5 text-warning"></i>
-                        <span>Proveedores & Compras</span>
+                        <span>Compras de Mercancía</span>
                     </a>
                 </li>
                 <li class="nav-item">
