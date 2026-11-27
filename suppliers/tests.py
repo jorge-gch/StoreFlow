@@ -4,7 +4,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.models import User
 from core.models import UserProfile
-from suppliers.models import Supplier, Purchase, PurchaseItem
+from suppliers.models import Supplier, Purchase, PurchaseItem, SupplierDebt, SupplierPayment
 from inventory.models import Category, Product, InventoryMovement
 
 class SupplierAndPurchasesTestCase(TestCase):
@@ -139,4 +139,83 @@ class SupplierAndPurchasesTestCase(TestCase):
     def test_employee_forbidden_to_create_purchase(self):
         self.client.login(username='emp_pur', password='Password123!')
         response = self.client.get(reverse('suppliers:purchase_create'))
+        self.assertEqual(response.status_code, 302)
+
+
+class SupplierDebtTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        self.admin = User.objects.create_user(username='admin_sdebt', password='Password123!')
+        self.admin.profile.role = UserProfile.ROLE_ADMIN
+        self.admin.profile.save()
+
+        self.employee = User.objects.create_user(username='emp_sdebt', password='Password123!')
+        self.employee.profile.role = UserProfile.ROLE_EMPLOYEE
+        self.employee.profile.save()
+
+        self.supplier = Supplier.objects.create(name='Proveedor Crédito S.A.', phone='6010001122')
+        self.category = Category.objects.create(name='Lácteos')
+        self.product = Product.objects.create(
+            name='Leche Entera 1L',
+            sku='LAC-001',
+            category=self.category,
+            cost_price=Decimal('3000.00'),
+            sale_price=Decimal('4500.00'),
+            stock=5,
+            min_stock=2,
+        )
+
+    def test_partial_purchase_auto_creates_debt_and_initial_payment(self):
+        self.client.login(username='admin_sdebt', password='Password123!')
+        payload = [{'product_id': self.product.id, 'quantity': 10, 'unit_cost': 3000.00}]
+
+        response = self.client.post(reverse('suppliers:purchase_create'), {
+            'supplier_id': self.supplier.id,
+            'payment_method': Purchase.PAYMENT_PARTIAL,
+            'initial_payment': '10000.00',
+            'items_json': json.dumps(payload),
+        })
+        self.assertEqual(response.status_code, 302)
+        purchase = Purchase.objects.first()
+        self.assertIsNotNone(purchase)
+        self.assertTrue(hasattr(purchase, 'debt'))
+        self.assertEqual(purchase.debt.total_amount, Decimal('30000.00'))
+        self.assertEqual(purchase.debt.paid_amount, Decimal('10000.00'))
+        self.assertEqual(purchase.debt.pending_balance, Decimal('20000.00'))
+        self.assertEqual(purchase.debt.payments.count(), 1)
+
+        # Registrar pago adicional vía vista
+        pay_res = self.client.post(reverse('suppliers:debt_register_payment', kwargs={'pk': purchase.debt.pk}), {
+            'amount': '20000.00',
+            'payment_method': SupplierPayment.PAYMENT_TRANSFER,
+            'reference': 'TRF-8821',
+            'notes': 'Saldo total',
+        })
+        self.assertEqual(pay_res.status_code, 302)
+        purchase.debt.refresh_from_db()
+        self.assertTrue(purchase.debt.is_paid)
+        self.assertEqual(purchase.debt.pending_balance, Decimal('0.00'))
+
+    def test_supplier_overpayment_raises_error(self):
+        purchase = Purchase.objects.create(
+            invoice_number='COM-DEBT-01',
+            supplier=self.supplier,
+            user=self.admin,
+            total=Decimal('5000.00'),
+            payment_method=Purchase.PAYMENT_CREDIT,
+        )
+        debt = SupplierDebt.objects.create(
+            supplier=self.supplier,
+            purchase=purchase,
+            total_amount=Decimal('5000.00'),
+            paid_amount=Decimal('0.00'),
+            pending_balance=Decimal('5000.00'),
+        )
+        with self.assertRaises(ValueError):
+            debt.register_payment(amount=Decimal('6000.00'), payment_method=SupplierPayment.PAYMENT_CASH, user=self.admin)
+
+    def test_employee_forbidden_to_access_supplier_debts(self):
+        self.client.login(username='emp_sdebt', password='Password123!')
+        response = self.client.get(reverse('suppliers:debt_list'))
         self.assertEqual(response.status_code, 302)

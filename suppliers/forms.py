@@ -1,5 +1,5 @@
 from django import forms
-from .models import Supplier
+from .models import Supplier, SupplierPayment
 
 class SupplierForm(forms.ModelForm):
     class Meta:
@@ -21,3 +21,29 @@ class SupplierForm(forms.ModelForm):
         if not name:
             raise forms.ValidationError('El nombre de la empresa o proveedor es obligatorio.')
         return name
+
+
+class SupplierPaymentForm(forms.Form):
+    amount = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0.01,
+        label='Valor del Pago',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+    )
+    payment_method = forms.ChoiceField(
+        choices=SupplierPayment.PAYMENT_METHOD_CHOICES,
+        label='Método de Pago',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    reference = forms.CharField(
+        required=False,
+        max_length=100,
+        label='Referencia / Comprobante',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Número de transferencia, recibo, etc.'})
+    )
+    notes = forms.CharField(
+        required=False,
+        label='Observaciones',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Observaciones opcionales...'})
+    )

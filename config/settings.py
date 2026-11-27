@@ -2,6 +2,7 @@
 Django settings for StoreFlow project.
 """
 
+import os
 from pathlib import Path
 from django.contrib.messages import constants as messages_constants
 
@@ -9,11 +10,17 @@ from django.contrib.messages import constants as messages_constants
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
-SECRET_KEY = 'django-insecure-g*wxdjqcvagjr4_noi)+8cz49b@r30oh71*rnw0+e3(-kdib*j'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-g*wxdjqcvagjr4_noi)+8cz49b@r30oh71*rnw0+e3(-kdib*j'
+)
 
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
+ALLOWED_HOSTS = os.environ.get(
+    'DJANGO_ALLOWED_HOSTS',
+    '127.0.0.1,localhost,testserver'
+).split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -116,5 +123,14 @@ MESSAGE_TAGS = {
 LOGIN_URL = 'core:login'
 LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGOUT_REDIRECT_URL = 'core:login'
+
+# Seguridad adicional
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

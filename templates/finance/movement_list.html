@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block title %}Ingresos y Egresos - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-cash-coin text-success me-2"></i> Ingresos y Egresos</h3>
+        <p class="text-muted small mb-0">Control de flujo de caja, ventas de contado, abonos y gastos operativos</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'finance:category_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-tags me-1"></i> Categorías
+        </a>
+        <a href="{% url 'finance:movement_create' %}?type=income" class="btn btn-success">
+            <i class="bi bi-plus-circle me-1"></i> Registrar Ingreso
+        </a>
+        <a href="{% url 'finance:movement_create' %}?type=expense" class="btn btn-danger">
+            <i class="bi bi-dash-circle me-1"></i> Registrar Egreso
+        </a>
+    </div>
+</div>
+
+<!-- Tarjetas de Resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Total Ingresos (Filtro)</span>
+            <h3 class="fw-bold text-success mt-1 mb-0">+${{ total_income|floatformat:2 }}</h3>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Total Egresos (Filtro)</span>
+            <h3 class="fw-bold text-danger mt-1 mb-0">-${{ total_expense|floatformat:2 }}</h3>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Balance Neto</span>
+            <h3 class="fw-bold mt-1 mb-0 {% if net_balance >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                ${{ net_balance|floatformat:2 }}
+            </h3>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-3">
+                <label class="form-label small fw-semibold text-secondary mb-1">Buscar</label>
+                <input type="text" name="q" value="{{ search }}" class="form-control form-control-sm" placeholder="Descripción, categoría...">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold text-secondary mb-1">Tipo</label>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="income" {% if type_filter == 'income' %}selected{% endif %}>Ingresos</option>
+                    <option value="expense" {% if type_filter == 'expense' %}selected{% endif %}>Egresos</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold text-secondary mb-1">Categoría</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">Todas</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if category_id == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold text-secondary mb-1">Desde</label>
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold text-secondary mb-1">Hasta</label>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary btn-sm flex-grow-1" title="Filtrar">
+                    <i class="bi bi-funnel"></i>
+                </button>
+                <a href="{% url 'finance:movement_list' %}" class="btn btn-outline-secondary btn-sm" title="Limpiar">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla de Movimientos -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+                <thead class="table-light text-uppercase text-muted">
+                    <tr>
+                        <th class="ps-4">Fecha y Hora</th>
+                        <th>Tipo</th>
+                        <th>Categoría</th>
+                        <th>Descripción</th>
+                        <th>Método</th>
+                        <th>Responsable</th>
+                        <th class="text-end">Valor</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in page_obj %}
+                        <tr class="{% if mov.is_cancelled %}table-secondary text-muted text-decoration-line-through{% endif %}">
+                            <td class="ps-4">{{ mov.date|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if mov.movement_type == 'income' %}
+                                    <span class="badge bg-success-subtle text-success">Ingreso</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">Egreso</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ mov.category.name }}</span></td>
+                            <td>
+                                <span class="fw-semibold text-dark">{{ mov.description }}</span>
+                                {% if mov.is_automatic %}
+                                    <span class="badge bg-info-subtle text-info ms-1" title="Generado automáticamente">Auto</span>
+                                {% endif %}
+                                {% if mov.is_cancelled %}
+                                    <span class="badge bg-secondary ms-1">Anulado</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.get_payment_method_display }}</td>
+                            <td>{{ mov.user.get_full_name|default:mov.user.username }}</td>
+                            <td class="text-end fw-bold {% if mov.movement_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                {% if mov.movement_type == 'income' %}+{% else %}-{% endif %}${{ mov.amount|floatformat:2 }}
+                            </td>
+                            <td class="text-end pe-4">
+                                {% if not mov.is_automatic and not mov.is_cancelled %}
+                                    <form method="post" action="{% url 'finance:movement_cancel' mov.pk %}" class="d-inline" onsubmit="return confirm('¿Desea anular este movimiento financiero?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Anular movimiento">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-cash-coin fs-1 d-block mb-2"></i>
+                                No hay movimientos financieros registrados con los filtros seleccionados.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+        <div class="card-footer bg-white py-3">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search }}&type={{ type_filter }}&category={{ category_id }}&date_from={{ date_from }}&date_to={{ date_to }}">Anterior</a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search }}&type={{ type_filter }}&category={{ category_id }}&date_from={{ date_from }}&date_to={{ date_to }}">Siguiente</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

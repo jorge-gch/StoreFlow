@@ -127,6 +127,20 @@ class Sale(models.Model):
                 notes=f"Motivo anulación: {reason}"
             )
 
+        # Anular deuda por cobrar asociada si existe
+        if hasattr(self, 'debt'):
+            self.debt.is_cancelled = True
+            self.debt.save(update_fields=['is_cancelled', 'updated_at'])
+            for pay in self.debt.payments.all():
+                if hasattr(pay, 'financial_movement'):
+                    pay.financial_movement.is_cancelled = True
+                    pay.financial_movement.save(update_fields=['is_cancelled'])
+
+        # Anular movimiento financiero asociado si existe (venta de contado)
+        if hasattr(self, 'financial_movement'):
+            self.financial_movement.is_cancelled = True
+            self.financial_movement.save(update_fields=['is_cancelled'])
+
 
 class SaleItem(models.Model):
     """

@@ -6,8 +6,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q, Sum
-from .models import Supplier, Purchase, PurchaseItem
-from .forms import SupplierForm
+from .models import Supplier, Purchase, PurchaseItem, SupplierDebt, SupplierPayment
+from .forms import SupplierForm, SupplierPaymentForm
 from inventory.models import Product, InventoryMovement
 from core.decorators import admin_required
 
@@ -109,9 +109,7 @@ def supplier_detail(request, pk):
     supplier = get_object_or_404(Supplier, pk=pk)
     purchases = supplier.purchases.all()[:10]
 
-    debts = []
-    if hasattr(supplier, 'debts'):
-        debts = supplier.debts.filter(is_paid=False)
+    debts = supplier.debts.select_related('purchase').filter(is_paid=False, is_cancelled=False)
 
     context = {
         'title': f'Ficha: {supplier.name}',
@@ -270,6 +268,50 @@ def purchase_create(request):
                 purchase.total = subtotal_calc
                 purchase.save(update_fields=['subtotal', 'total'])
 
+                # Auto-crear cuenta por pagar para compras a crédito o pago parcial
+                if payment_method in [Purchase.PAYMENT_CREDIT, Purchase.PAYMENT_PARTIAL]:
+                    initial_payment = Decimal(str(request.POST.get('initial_payment', '0') or '0'))
+                    if initial_payment < Decimal('0.00'):
+                        initial_payment = Decimal('0.00')
+                    if initial_payment > purchase.total:
+                        raise ValueError('El abono inicial no puede ser mayor al total de la compra.')
+
+                    debt = SupplierDebt.objects.create(
+                        supplier=supplier,
+                        purchase=purchase,
+                        total_amount=purchase.total,
+                        paid_amount=Decimal('0.00'),
+                        pending_balance=purchase.total,
+                    )
+                    if payment_method == Purchase.PAYMENT_PARTIAL and initial_payment > Decimal('0.00'):
+                        debt.register_payment(
+                            amount=initial_payment,
+                            payment_method=SupplierPayment.PAYMENT_CASH,
+                            user=request.user,
+                            notes=f'Abono inicial en Compra #{purchase.invoice_number}',
+                        )
+
+                # Registrar movimiento financiero solo si sale dinero de inmediato (contado/transferencia).
+                if payment_method in [Purchase.PAYMENT_CASH, Purchase.PAYMENT_TRANSFER] and purchase.total > Decimal('0.00'):
+                    from finance.models import FinancialCategory, FinancialMovement
+                    category = FinancialCategory.get_or_create_system_category(
+                        'Compra de Mercancía', FinancialCategory.TYPE_EXPENSE
+                    )
+                    fin_method = (
+                        FinancialMovement.PAYMENT_TRANSFER
+                        if payment_method == Purchase.PAYMENT_TRANSFER
+                        else FinancialMovement.PAYMENT_CASH
+                    )
+                    FinancialMovement.objects.create(
+                        movement_type=FinancialMovement.TYPE_EXPENSE,
+                        category=category,
+                        description=f"Compra #{purchase.invoice_number} - {supplier.name}",
+                        amount=purchase.total,
+                        payment_method=fin_method,
+                        user=request.user,
+                        purchase=purchase,
+                    )
+
                 messages.success(request, f'¡Compra #{purchase.invoice_number} registrada exitosamente por ${purchase.total:,.2f}!')
                 return redirect('suppliers:purchase_detail', pk=purchase.pk)
 
@@ -341,3 +383,98 @@ def purchase_cancel(request, pk):
             messages.error(request, f'Error al anular la compra: {str(e)}')
 
     return redirect('suppliers:purchase_detail', pk=purchase.pk)
+
+
+# ==============================================================================
+# CUENTAS POR PAGAR (FASE 7)
+# ==============================================================================
+
+@login_required
+@admin_required
+def debt_list(request):
+    """
+    Listado de cuentas por pagar a proveedores con filtros.
+    """
+    search = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', 'pending')
+
+    debts = SupplierDebt.objects.select_related('supplier', 'purchase').filter(is_cancelled=False)
+
+    if search:
+        debts = debts.filter(
+            Q(supplier__name__icontains=search) |
+            Q(purchase__invoice_number__icontains=search)
+        )
+
+    if status_filter == 'pending':
+        debts = debts.filter(is_paid=False)
+    elif status_filter == 'paid':
+        debts = debts.filter(is_paid=True)
+
+    total_pending = debts.filter(is_paid=False).aggregate(
+        total=Sum('pending_balance')
+    )['total'] or Decimal('0.00')
+
+    paginator = Paginator(debts, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'title': 'Cuentas por Pagar',
+        'page_obj': page_obj,
+        'search': search,
+        'status_filter': status_filter,
+        'total_pending': total_pending,
+        'total_count': debts.count(),
+    }
+    return render(request, 'suppliers/debt_list.html', context)
+
+
+@login_required
+@admin_required
+def debt_detail(request, pk):
+    """
+    Detalle de una cuenta por pagar e historial de pagos al proveedor.
+    """
+    debt = get_object_or_404(SupplierDebt.objects.select_related('supplier', 'purchase'), pk=pk)
+    payments = debt.payments.select_related('user').all()
+    form = SupplierPaymentForm()
+
+    context = {
+        'title': f'Cuenta por Pagar – {debt.supplier.name}',
+        'debt': debt,
+        'payments': payments,
+        'form': form,
+    }
+    return render(request, 'suppliers/debt_detail.html', context)
+
+
+@login_required
+@admin_required
+def debt_register_payment(request, pk):
+    """
+    Registra un pago o abono a un proveedor.
+    """
+    debt = get_object_or_404(SupplierDebt, pk=pk)
+
+    if request.method == 'POST':
+        form = SupplierPaymentForm(request.POST)
+        if form.is_valid():
+            try:
+                debt.register_payment(
+                    amount=form.cleaned_data['amount'],
+                    payment_method=form.cleaned_data['payment_method'],
+                    user=request.user,
+                    reference=form.cleaned_data.get('reference', ''),
+                    notes=form.cleaned_data.get('notes', '')
+                )
+                messages.success(request, f'Pago de ${form.cleaned_data["amount"]:,.2f} registrado correctamente.')
+            except ValueError as e:
+                messages.error(request, str(e))
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{error}')
+    else:
+        messages.error(request, 'Método no permitido.')
+
+    return redirect('suppliers:debt_detail', pk=debt.pk)

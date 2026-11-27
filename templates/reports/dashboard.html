@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+
+{% block title %}Reportes y Estadísticas - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-line text-info me-2"></i> Reportes y Estadísticas</h3>
+        <p class="text-muted small mb-0">Análisis del desempeño comercial, rotación de inventario, cartera y flujo financiero</p>
+    </div>
+    <div class="btn-group" role="group">
+        <a href="?preset=day" class="btn btn-sm {% if preset == 'day' %}btn-primary{% else %}btn-outline-primary{% endif %}">Hoy</a>
+        <a href="?preset=week" class="btn btn-sm {% if preset == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">Últimos 7 días</a>
+        <a href="?preset=month" class="btn btn-sm {% if preset == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">Mes Actual</a>
+    </div>
+</div>
+
+<!-- Filtro por rango de fechas -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold text-secondary mb-1">Fecha Desde</label>
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold text-secondary mb-1">Fecha Hasta</label>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i> Aplicar Período
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tarjetas KPI del Período -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Ventas del Período</span>
+            <h3 class="fw-bold text-primary mt-1 mb-0">${{ sales_total|floatformat:2 }}</h3>
+            <small class="text-muted">{{ sales_count }} factura(s) | Ticket prom: ${{ avg_ticket|floatformat:2 }}</small>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Ingresos Recibidos</span>
+            <h3 class="fw-bold text-success mt-1 mb-0">+${{ income_total|floatformat:2 }}</h3>
+            <small class="text-muted">Contado, abonos y otros</small>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Egresos</span>
+            <h3 class="fw-bold text-danger mt-1 mb-0">-${{ expense_total|floatformat:2 }}</h3>
+            <small class="text-muted">Compras, pagos y gastos</small>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Ganancia Estimada</span>
+            <h3 class="fw-bold mt-1 mb-0 {% if estimated_profit >= 0 %}text-info{% else %}text-danger{% endif %}">
+                ${{ estimated_profit|floatformat:2 }}
+            </h3>
+            <small class="text-muted">Ingresos - Egresos del período</small>
+        </div>
+    </div>
+</div>
+
+<!-- Pestañas de Reportes -->
+<ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-sales" type="button">
+            <i class="bi bi-receipt me-1"></i> Ventas
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-products" type="button">
+            <i class="bi bi-box-seam me-1"></i> Rotación Productos
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-finance" type="button">
+            <i class="bi bi-cash-coin me-1"></i> Finanzas
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-debts" type="button">
+            <i class="bi bi-wallet2 me-1"></i> Cartera (Cobrar/Pagar)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-inventory" type="button">
+            <i class="bi bi-arrow-left-right me-1"></i> Kardex Inventario
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- TAB 1: VENTAS -->
+    <div class="tab-pane fade show active" id="tab-sales">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Comportamiento Diario de Ventas</h6>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'reports:export_excel' %}?report=sales&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                    </a>
+                    <a href="{% url 'reports:export_pdf' %}?report=sales&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="height: 240px;">
+                    <canvas id="salesReportChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Factura</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Método</th>
+                                <th class="text-end pe-3">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in sales_list %}
+                                <tr>
+                                    <td class="ps-3 fw-semibold"><a href="{% url 'sales:sale_detail' s.pk %}" class="text-decoration-none">#{{ s.invoice_number }}</a></td>
+                                    <td>{{ s.date|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ s.customer.name|default:"Consumidor Final" }}</td>
+                                    <td>{{ s.get_payment_method_display }}</td>
+                                    <td class="text-end pe-3 fw-bold">${{ s.total|floatformat:2 }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5" class="text-center py-4 text-muted">No hay ventas completadas en el período.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: PRODUCTOS -->
+    <div class="tab-pane fade" id="tab-products">
+        <div class="row g-4">
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0 text-success">Top Productos Más Vendidos</h6>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'reports:export_excel' %}?report=top_products&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">Excel</a>
+                            <a href="{% url 'reports:export_pdf' %}?report=top_products&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">PDF</a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Producto</th>
+                                    <th class="text-center">Unidades</th>
+                                    <th class="text-end pe-3">Ingresos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in top_products %}
+                                    <tr>
+                                        <td class="ps-3">
+                                            <div class="fw-semibold">{{ item.product__name }}</div>
+                                            <span class="text-muted">{{ item.product__sku }}</span>
+                                        </td>
+                                        <td class="text-center fw-bold text-primary">{{ item.units }}</td>
+                                        <td class="text-end pe-3 fw-semibold">${{ item.revenue|floatformat:2 }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">Sin datos en el período.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0 text-warning">Productos con Menor Rotación</h6>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'reports:export_excel' %}?report=low_rotation&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">Excel</a>
+                            <a href="{% url 'reports:export_pdf' %}?report=low_rotation&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">PDF</a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Producto</th>
+                                    <th class="text-center">Stock</th>
+                                    <th class="text-end pe-3">Vendidas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in low_rotation_products %}
+                                    <tr>
+                                        <td class="ps-3">
+                                            <div class="fw-semibold">{{ row.product.name }}</div>
+                                            <span class="text-muted">{{ row.product.sku }}</span>
+                                        </td>
+                                        <td class="text-center">{{ row.product.stock }}</td>
+                                        <td class="text-end pe-3 fw-bold text-danger">{{ row.units }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">Sin productos activos.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: FINANZAS -->
+    <div class="tab-pane fade" id="tab-finance">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Resumen por Categoría Financiera</h6>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'reports:export_excel' %}?report=finance&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                    </a>
+                    <a href="{% url 'reports:export_pdf' %}?report=finance&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Categoría</th>
+                            <th>Tipo</th>
+                            <th class="text-end pe-3">Total Acumulado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in finance_by_category %}
+                            <tr>
+                                <td class="ps-3 fw-semibold">{{ row.category__name }}</td>
+                                <td>
+                                    {% if row.movement_type == 'income' %}
+                                        <span class="badge bg-success-subtle text-success">Ingreso</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger">Egreso</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-3 fw-bold">${{ row.total|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="text-center py-4 text-muted">No hay movimientos financieros en el período.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: CARTERA -->
+    <div class="tab-pane fade" id="tab-debts">
+        <div class="row g-4">
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Cuentas por Cobrar</h6>
+                            <small class="text-danger fw-semibold">Total: ${{ total_receivables|floatformat:2 }}</small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'reports:export_excel' %}?report=receivables&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">Excel</a>
+                            <a href="{% url 'reports:export_pdf' %}?report=receivables&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">PDF</a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Cliente</th>
+                                    <th>Factura</th>
+                                    <th class="text-end pe-3">Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in receivables %}
+                                    <tr>
+                                        <td class="ps-3 fw-semibold">{{ d.customer.name }}</td>
+                                        <td>#{{ d.sale.invoice_number }}</td>
+                                        <td class="text-end pe-3 fw-bold text-danger">${{ d.pending_balance|floatformat:2 }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">Sin cuentas por cobrar pendientes.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Cuentas por Pagar</h6>
+                            <small class="text-warning fw-semibold">Total: ${{ total_payables|floatformat:2 }}</small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'reports:export_excel' %}?report=payables&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">Excel</a>
+                            <a href="{% url 'reports:export_pdf' %}?report=payables&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">PDF</a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Proveedor</th>
+                                    <th>Compra</th>
+                                    <th class="text-end pe-3">Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in payables %}
+                                    <tr>
+                                        <td class="ps-3 fw-semibold">{{ d.supplier.name }}</td>
+                                        <td>#{{ d.purchase.invoice_number }}</td>
+                                        <td class="text-end pe-3 fw-bold text-danger">${{ d.pending_balance|floatformat:2 }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="3" class="text-center py-4 text-muted">Sin cuentas por pagar pendientes.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: KARDEX -->
+    <div class="tab-pane fade" id="tab-inventory">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Movimientos de Inventario del Período</h6>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'reports:export_excel' %}?report=inventory_movements&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                    </a>
+                    <a href="{% url 'reports:export_pdf' %}?report=inventory_movements&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Fecha</th>
+                                <th>Producto</th>
+                                <th>Tipo</th>
+                                <th class="text-center">Cantidad</th>
+                                <th class="text-center">Stock Nuevo</th>
+                                <th>Referencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in inventory_movements %}
+                                <tr>
+                                    <td class="ps-3">{{ m.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td class="fw-semibold">{{ m.product.name }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ m.get_movement_type_display }}</span></td>
+                                    <td class="text-center fw-bold">{{ m.quantity }}</td>
+                                    <td class="text-center">{{ m.new_stock }}</td>
+                                    <td class="text-muted">{{ m.reference }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="6" class="text-center py-4 text-muted">No hay movimientos de inventario en el período.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('salesReportChart');
+        if (!ctx) return;
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ sales_chart_labels_json|safe }},
+                datasets: [{
+                    label: 'Ventas ($)',
+                    data: {{ sales_chart_data_json|safe }},
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.12)',
+                    fill: true,
+                    tension: 0.3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

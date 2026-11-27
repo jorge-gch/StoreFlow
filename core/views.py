@@ -96,9 +96,17 @@ def dashboard_view(request):
     # Intentar obtener métricas financieras si el modelo existe
     try:
         from finance.models import FinancialMovement
-        income_qs = FinancialMovement.objects.filter(movement_type='income', date__gte=start_of_month)
-        expenses_qs = FinancialMovement.objects.filter(movement_type='expense', date__gte=start_of_month)
-        
+        income_qs = FinancialMovement.objects.filter(
+            movement_type=FinancialMovement.TYPE_INCOME,
+            is_cancelled=False,
+            date__date__gte=start_of_month,
+        )
+        expenses_qs = FinancialMovement.objects.filter(
+            movement_type=FinancialMovement.TYPE_EXPENSE,
+            is_cancelled=False,
+            date__date__gte=start_of_month,
+        )
+
         metrics['income_month'] = income_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         metrics['expenses_month'] = expenses_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         metrics['estimated_profit'] = metrics['income_month'] - metrics['expenses_month']
@@ -108,27 +116,58 @@ def dashboard_view(request):
     # Intentar obtener cuentas por cobrar si el modelo existe
     try:
         from customers.models import CustomerDebt
-        metrics['pending_receivables'] = CustomerDebt.objects.filter(is_paid=False).aggregate(total=Sum('pending_balance'))['total'] or Decimal('0.00')
+        metrics['pending_receivables'] = CustomerDebt.objects.filter(
+            is_paid=False, is_cancelled=False
+        ).aggregate(total=Sum('pending_balance'))['total'] or Decimal('0.00')
     except Exception:
         pass
 
     # Intentar obtener cuentas por pagar si el modelo existe
     try:
         from suppliers.models import SupplierDebt
-        metrics['pending_payables'] = SupplierDebt.objects.filter(is_paid=False).aggregate(total=Sum('pending_balance'))['total'] or Decimal('0.00')
+        metrics['pending_payables'] = SupplierDebt.objects.filter(
+            is_paid=False, is_cancelled=False
+        ).aggregate(total=Sum('pending_balance'))['total'] or Decimal('0.00')
     except Exception:
         pass
 
-    # Generar etiquetas de los últimos 6 meses para la gráfica
+    # Generar etiquetas y datos reales de los últimos 6 meses para la gráfica
     months_labels = []
-    income_data = [0, 0, 0, 0, 0, 0]
-    expenses_data = [0, 0, 0, 0, 0, 0]
+    income_data = []
+    expenses_data = []
 
     month_names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    current_month = today.month
     for i in range(5, -1, -1):
-        m = (current_month - i - 1) % 12 + 1
-        months_labels.append(month_names[m - 1])
+        # Calcular año y mes retrocediendo i meses desde hoy
+        total_months = today.year * 12 + (today.month - 1) - i
+        year = total_months // 12
+        month = total_months % 12 + 1
+        months_labels.append(f"{month_names[month - 1]} {year % 100:02d}")
+
+        m_income = 0.0
+        m_expense = 0.0
+        try:
+            from finance.models import FinancialMovement
+            m_income = float(
+                FinancialMovement.objects.filter(
+                    movement_type=FinancialMovement.TYPE_INCOME,
+                    is_cancelled=False,
+                    date__year=year,
+                    date__month=month,
+                ).aggregate(total=Sum('amount'))['total'] or 0
+            )
+            m_expense = float(
+                FinancialMovement.objects.filter(
+                    movement_type=FinancialMovement.TYPE_EXPENSE,
+                    is_cancelled=False,
+                    date__year=year,
+                    date__month=month,
+                ).aggregate(total=Sum('amount'))['total'] or 0
+            )
+        except Exception:
+            pass
+        income_data.append(m_income)
+        expenses_data.append(m_expense)
 
     context = {
         'title': 'Dashboard Principal',

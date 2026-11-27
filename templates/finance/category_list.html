@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Categorías Financieras - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-tags text-primary me-2"></i> Categorías Financieras</h3>
+        <p class="text-muted small mb-0">Clasificación de ingresos y gastos operativos</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'finance:movement_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Movimientos
+        </a>
+        <a href="{% url 'finance:category_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nueva Categoría
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted">
+                    <tr>
+                        <th class="ps-4">Nombre</th>
+                        <th>Tipo</th>
+                        <th>Descripción</th>
+                        <th>Estado</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat in categories %}
+                        <tr>
+                            <td class="ps-4 fw-semibold text-dark">
+                                {{ cat.name }}
+                                {% if cat.is_system %}
+                                    <span class="badge bg-info-subtle text-info ms-1">Sistema</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if cat.movement_type == 'income' %}
+                                    <span class="badge bg-success-subtle text-success">Ingreso</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">Egreso</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ cat.description|default:"—" }}</td>
+                            <td>
+                                {% if cat.is_active %}
+                                    <span class="badge bg-success-subtle text-success">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'finance:category_update' cat.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No hay categorías registradas.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

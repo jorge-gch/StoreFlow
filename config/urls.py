@@ -14,8 +14,8 @@ urlpatterns = [
     path('clientes/', include('customers.urls')),
     path('proveedores/', include('suppliers.urls')),
     path('ventas/', include('sales.urls')),
-    # En las siguientes fases se irán vinculando las URLs de:
-    # inventory, sales, customers, finance, suppliers, reports
+    path('finanzas/', include('finance.urls')),
+    path('reportes/', include('reports.urls')),
 ]
 
 if settings.DEBUG:

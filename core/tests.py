@@ -95,3 +95,82 @@ class AuthenticationAndRolesTestCase(TestCase):
         self.employee_user.refresh_from_db()
         self.assertEqual(self.employee_user.first_name, 'Laura Modificada')
         self.assertEqual(self.employee_user.profile.phone, '3009998877')
+
+
+class EndToEndConsistencyTestCase(TestCase):
+    """
+    Prueba integral de flujo completo: compra -> venta contado -> venta crédito -> abono -> dashboard.
+    Valida consistencia entre inventario, cartera y finanzas.
+    """
+    def test_full_store_lifecycle_consistency(self):
+        import json
+        from decimal import Decimal
+        from inventory.models import Category, Product
+        from customers.models import Customer, CustomerPayment
+        from suppliers.models import Supplier, Purchase
+        from sales.models import Sale
+        from finance.models import FinancialMovement
+
+        admin = User.objects.create_user(username='e2e_admin', password='Password123!')
+        admin.profile.role = UserProfile.ROLE_ADMIN
+        admin.profile.save()
+
+        cat = Category.objects.create(name='Bebidas')
+        product = Product.objects.create(
+            name='Jugo Natural',
+            sku='BEB-010',
+            category=cat,
+            cost_price=Decimal('2000.00'),
+            sale_price=Decimal('3500.00'),
+            stock=0,
+            min_stock=5,
+        )
+        supplier = Supplier.objects.create(name='Distribuidora Sur', phone='6011234567')
+        customer = Customer.objects.create(name='María López', phone='3001234567')
+
+        self.client.login(username='e2e_admin', password='Password123!')
+
+        # 1. Compra de 10 unidades de contado ($20,000 egreso)
+        self.client.post(reverse('suppliers:purchase_create'), {
+            'supplier_id': supplier.id,
+            'payment_method': Purchase.PAYMENT_CASH,
+            'items_json': json.dumps([{'product_id': product.id, 'quantity': 10, 'unit_cost': 2000.00}]),
+        })
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 10)
+
+        # 2. Venta de 3 unidades de contado ($10,500 ingreso)
+        self.client.post(reverse('sales:pos'), {
+            'customer_id': customer.id,
+            'payment_method': Sale.PAYMENT_CASH,
+            'discount': '0',
+            'items_json': json.dumps([{'product_id': product.id, 'quantity': 3}]),
+        })
+
+        # 3. Venta de 2 unidades a crédito ($7,000 por cobrar, $0 ingreso inmediato)
+        self.client.post(reverse('sales:pos'), {
+            'customer_id': customer.id,
+            'payment_method': Sale.PAYMENT_CREDIT,
+            'discount': '0',
+            'items_json': json.dumps([{'product_id': product.id, 'quantity': 2}]),
+        })
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 5)  # 10 - 3 - 2 = 5
+
+        credit_sale = Sale.objects.filter(payment_method=Sale.PAYMENT_CREDIT).first()
+        self.assertEqual(credit_sale.debt.pending_balance, Decimal('7000.00'))
+
+        # 4. Abono de $4,000 a la deuda
+        self.client.post(reverse('customers:debt_register_payment', kwargs={'pk': credit_sale.debt.pk}), {
+            'amount': '4000.00',
+            'payment_method': CustomerPayment.PAYMENT_TRANSFER,
+        })
+
+        # Verificar consistencia en Dashboard
+        res = self.client.get(reverse('core:dashboard'))
+        self.assertEqual(res.status_code, 200)
+        metrics = res.context['metrics']
+        self.assertEqual(metrics['income_month'], Decimal('14500.00'))   # 10,500 + 4,000
+        self.assertEqual(metrics['expenses_month'], Decimal('20000.00')) # 20,000 compra
+        self.assertEqual(metrics['pending_receivables'], Decimal('3000.00'))  # 7,000 - 4,000
+        self.assertEqual(FinancialMovement.objects.filter(is_cancelled=False).count(), 3)

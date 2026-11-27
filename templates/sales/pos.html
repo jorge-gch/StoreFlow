@@ -123,12 +123,21 @@
                         </div>
                         <div class="col-5">
                             <label class="form-label small fw-semibold text-secondary mb-1">Método de Pago</label>
-                            <select name="payment_method" class="form-select form-select-sm" required>
+                            <select name="payment_method" id="posPaymentMethod" class="form-select form-select-sm" required>
                                 <option value="cash" selected>Efectivo</option>
                                 <option value="transfer">Transferencia</option>
                                 <option value="credit">Crédito</option>
                                 <option value="partial">Pago Parcial</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2 d-none" id="posInitialPaymentGroup">
+                        <div class="d-flex justify-content-between align-items-center small mb-1">
+                            <span class="text-primary fw-semibold">Abono Inicial ($):</span>
+                            <div style="width: 120px;">
+                                <input type="number" step="0.01" min="0" name="initial_payment" id="posInitialPaymentInput" class="form-control form-control-sm text-end" value="0.00">
+                            </div>
                         </div>
                     </div>
 
@@ -341,6 +350,21 @@
                 updateCartUI();
             }
         });
+
+        // Mostrar/ocultar abono inicial si es Pago Parcial
+        const paymentSelect = document.getElementById('posPaymentMethod');
+        const initialPaymentGroup = document.getElementById('posInitialPaymentGroup');
+        const initialPaymentInput = document.getElementById('posInitialPaymentInput');
+        if (paymentSelect) {
+            paymentSelect.addEventListener('change', () => {
+                if (paymentSelect.value === 'partial') {
+                    initialPaymentGroup.classList.remove('d-none');
+                } else {
+                    initialPaymentGroup.classList.add('d-none');
+                    initialPaymentInput.value = '0.00';
+                }
+            });
+        }
 
         // Inicializar catálogo
         renderCatalog();

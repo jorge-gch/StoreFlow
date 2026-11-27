@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}Cuenta por Pagar #{{ debt.purchase.invoice_number }} - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-light text-dark border">Compra #{{ debt.purchase.invoice_number }}</span>
+            {% if debt.is_cancelled %}
+                <span class="badge bg-secondary">Anulada</span>
+            {% elif debt.is_paid %}
+                <span class="badge bg-success">Saldada</span>
+            {% elif debt.is_overdue %}
+                <span class="badge bg-danger">Vencida</span>
+            {% else %}
+                <span class="badge bg-warning text-dark">Pendiente</span>
+            {% endif %}
+        </div>
+        <h3 class="fw-bold text-dark mb-0">Cuenta por Pagar: {{ debt.supplier.name }}</h3>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'suppliers:debt_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Cuentas por Pagar
+        </a>
+        {% if not debt.is_paid and not debt.is_cancelled %}
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                <i class="bi bi-credit-card me-1"></i> Registrar Pago
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Monto Total Compra</span>
+            <h3 class="fw-bold text-dark mt-1 mb-1">${{ debt.total_amount|floatformat:2 }}</h3>
+            <small class="text-muted">Fecha registro: {{ debt.created_at|date:"d/m/Y H:i" }}</small>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Total Pagado</span>
+            <h3 class="fw-bold text-success mt-1 mb-1">${{ debt.paid_amount|floatformat:2 }}</h3>
+            <small class="text-muted">{{ payments|length }} pago(s) registrado(s)</small>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-3 h-100">
+            <span class="text-muted small fw-semibold text-uppercase">Saldo Pendiente</span>
+            <h3 class="fw-bold mt-1 mb-1 {% if debt.pending_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                ${{ debt.pending_balance|floatformat:2 }}
+            </h3>
+            <small class="text-muted">
+                Vencimiento: {% if debt.due_date %}{{ debt.due_date|date:"d/m/Y" }}{% else %}No definido{% endif %}
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Datos del Proveedor y Compra -->
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm p-4 h-100">
+            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-building text-primary me-2"></i> Información Asociada</h5>
+            <ul class="list-unstyled small mb-0">
+                <li class="py-2 border-bottom d-flex justify-content-between">
+                    <span class="text-muted">Proveedor:</span>
+                    <a href="{% url 'suppliers:supplier_detail' debt.supplier.pk %}" class="fw-semibold text-decoration-none">{{ debt.supplier.name }}</a>
+                </li>
+                <li class="py-2 border-bottom d-flex justify-content-between">
+                    <span class="text-muted">Teléfono:</span>
+                    <span class="text-dark">{{ debt.supplier.phone }}</span>
+                </li>
+                <li class="py-2 border-bottom d-flex justify-content-between">
+                    <span class="text-muted">Orden Compra:</span>
+                    <a href="{% url 'suppliers:purchase_detail' debt.purchase.pk %}" class="fw-semibold text-decoration-none">#{{ debt.purchase.invoice_number }}</a>
+                </li>
+                <li class="py-2 d-flex justify-content-between">
+                    <span class="text-muted">Método Compra:</span>
+                    <span class="text-dark">{{ debt.purchase.get_payment_method_display }}</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Historial de Pagos -->
+    <div class="col-12 col-md-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-clock-history text-primary me-2"></i> Historial de Pagos</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Fecha y Hora</th>
+                                <th>Monto Pagado</th>
+                                <th>Método</th>
+                                <th>Referencia</th>
+                                <th>Usuario</th>
+                                <th>Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in payments %}
+                                <tr>
+                                    <td class="ps-3">{{ payment.date|date:"d/m/Y H:i" }}</td>
+                                    <td class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ payment.get_payment_method_display }}</span></td>
+                                    <td class="text-dark">{{ payment.reference|default:"—" }}</td>
+                                    <td>{{ payment.user.get_full_name|default:payment.user.username }}</td>
+                                    <td class="text-muted">{{ payment.notes|default:"—" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="bi bi-inbox fs-2 d-block mb-1"></i>
+                                        Aún no se han registrado pagos para esta obligación.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+{% if not debt.is_paid and not debt.is_cancelled %}
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="paymentModalLabel"><i class="bi bi-credit-card me-2"></i> Registrar Pago a Proveedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" action="{% url 'suppliers:debt_register_payment' debt.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-light border d-flex justify-content-between align-items-center mb-3">
+                        <span class="small text-muted">Saldo Pendiente Actual:</span>
+                        <span class="fs-5 fw-bold text-danger">${{ debt.pending_balance|floatformat:2 }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">{{ form.amount.label }}</label>
+                        {{ form.amount }}
+                        <div class="form-text">Máximo permitido: ${{ debt.pending_balance|floatformat:2 }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">{{ form.payment_method.label }}</label>
+                        {{ form.payment_method }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">{{ form.reference.label }}</label>
+                        {{ form.reference }}
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold small">{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i> Confirmar Pago
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

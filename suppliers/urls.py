@@ -16,4 +16,9 @@ urlpatterns = [
     path('compras/nueva/', views.purchase_create, name='purchase_create'),
     path('compras/<int:pk>/', views.purchase_detail, name='purchase_detail'),
     path('compras/<int:pk>/anular/', views.purchase_cancel, name='purchase_cancel'),
+
+    # Cuentas por Pagar (Fase 7)
+    path('cuentas-pagar/', views.debt_list, name='debt_list'),
+    path('cuentas-pagar/<int:pk>/', views.debt_detail, name='debt_detail'),
+    path('cuentas-pagar/<int:pk>/pagar/', views.debt_register_payment, name='debt_register_payment'),
 ]

@@ -1,5 +1,5 @@
 from django import forms
-from .models import Customer
+from .models import Customer, CustomerPayment
 
 class CustomerForm(forms.ModelForm):
     class Meta:
@@ -20,3 +20,23 @@ class CustomerForm(forms.ModelForm):
         if not name:
             raise forms.ValidationError('El nombre del cliente es obligatorio.')
         return name
+
+
+class CustomerPaymentForm(forms.Form):
+    amount = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0.01,
+        label='Valor del Abono',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+    )
+    payment_method = forms.ChoiceField(
+        choices=CustomerPayment.PAYMENT_METHOD_CHOICES,
+        label='Método de Pago',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    notes = forms.CharField(
+        required=False,
+        label='Observaciones',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Observaciones opcionales...'})
+    )

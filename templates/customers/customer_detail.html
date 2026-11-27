@@ -91,7 +91,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
                 <h6 class="fw-bold text-dark mb-0"><i class="bi bi-wallet2 text-danger me-2"></i> Créditos y Cuentas por Cobrar</h6>
-                <span class="badge bg-light text-muted border">Módulo Deudas (Fase 7)</span>
+                <a href="{% url 'customers:debt_list' %}?q={{ customer.name|urlencode }}" class="btn btn-sm btn-outline-primary">Ver todas</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -103,20 +103,34 @@
                                 <th>Total Facturado</th>
                                 <th>Saldo Pendiente</th>
                                 <th>Estado</th>
+                                <th class="text-end pe-3">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for debt in debts %}
                                 <tr>
-                                    <td>#{{ debt.sale.invoice_number }}</td>
+                                    <td>
+                                        <a href="{% url 'sales:sale_detail' debt.sale.pk %}" class="text-decoration-none fw-semibold">
+                                            #{{ debt.sale.invoice_number }}
+                                        </a>
+                                    </td>
                                     <td>{{ debt.created_at|date:"d/m/Y" }}</td>
                                     <td>${{ debt.total_amount|floatformat:2 }}</td>
                                     <td class="fw-bold text-danger">${{ debt.pending_balance|floatformat:2 }}</td>
-                                    <td><span class="badge bg-warning text-dark">Pendiente</span></td>
+                                    <td>
+                                        {% if debt.is_overdue %}
+                                            <span class="badge bg-danger">Vencida</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Pendiente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <a href="{% url 'customers:debt_detail' debt.pk %}" class="btn btn-sm btn-outline-success">Abonar</a>
+                                    </td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">
+                                    <td colspan="6" class="text-center py-4 text-muted">
                                         <i class="bi bi-shield-check fs-2 d-block mb-1 text-success"></i>
                                         El cliente no tiene deudas pendientes en este momento.
                                     </td>

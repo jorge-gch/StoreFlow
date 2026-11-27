@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Cuentas por Cobrar - StoreFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-wallet2 text-danger me-2"></i> Cuentas por Cobrar</h3>
+        <p class="text-muted small mb-0">Control de créditos otorgados a clientes y gestión de abonos</p>
+    </div>
+    <div class="card border-0 shadow-sm px-4 py-2 bg-white">
+        <span class="text-muted small text-uppercase fw-semibold d-block">Total Pendiente por Cobrar</span>
+        <span class="fs-4 fw-bold text-danger">${{ total_pending|floatformat:2 }}</span>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label class="form-label small fw-semibold text-secondary mb-1">Buscar</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" value="{{ search }}" class="form-control border-start-0" placeholder="Nombre de cliente o N° factura...">
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold text-secondary mb-1">Estado</label>
+                <select name="status" class="form-select">
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pendientes de Pago</option>
+                    <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Saldadas</option>
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Todas</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i> Filtrar
+                </button>
+                <a href="{% url 'customers:debt_list' %}" class="btn btn-outline-secondary" title="Limpiar filtros">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted">
+                    <tr>
+                        <th class="ps-4">Cliente</th>
+                        <th>Factura</th>
+                        <th>Total</th>
+                        <th>Abonado</th>
+                        <th>Saldo Pendiente</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for debt in page_obj %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{% url 'customers:customer_detail' debt.customer.pk %}" class="fw-semibold text-dark text-decoration-none">
+                                    {{ debt.customer.name }}
+                                </a>
+                                <div class="small text-muted">{{ debt.customer.phone }}</div>
+                            </td>
+                            <td>
+                                <a href="{% url 'sales:sale_detail' debt.sale.pk %}" class="badge bg-light text-dark border text-decoration-none">
+                                    #{{ debt.sale.invoice_number }}
+                                </a>
+                            </td>
+                            <td>${{ debt.total_amount|floatformat:2 }}</td>
+                            <td class="text-success">${{ debt.paid_amount|floatformat:2 }}</td>
+                            <td class="fw-bold {% if debt.pending_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                                ${{ debt.pending_balance|floatformat:2 }}
+                            </td>
+                            <td class="small">
+                                {% if debt.due_date %}
+                                    {{ debt.due_date|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-muted">Sin fecha</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if debt.is_paid %}
+                                    <span class="badge bg-success-subtle text-success">Pagada</span>
+                                {% elif debt.is_overdue %}
+                                    <span class="badge bg-danger">Vencida</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'customers:debt_detail' debt.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i> Ver / Abonar
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                                No se encontraron cuentas por cobrar con los filtros aplicados.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+        <div class="card-footer bg-white py-3">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search }}&status={{ status_filter }}">Anterior</a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search }}&status={{ status_filter }}">Siguiente</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

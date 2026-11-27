@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 from inventory.models import Product, InventoryMovement
 
 class Supplier(models.Model):
@@ -37,10 +38,10 @@ class Supplier(models.Model):
     @property
     def total_debt(self):
         """Saldo total pendiente de pago al proveedor."""
-        if hasattr(self, 'debts'):
-            total = self.debts.filter(is_paid=False).aggregate(models.Sum('pending_balance'))['pending_balance__sum']
-            return total or Decimal('0.00')
-        return Decimal('0.00')
+        total = self.debts.filter(is_paid=False, is_cancelled=False).aggregate(
+            models.Sum('pending_balance')
+        )['pending_balance__sum']
+        return total or Decimal('0.00')
 
 
 class Purchase(models.Model):
@@ -164,6 +165,20 @@ class Purchase(models.Model):
                 notes=f"Proveedor: {self.supplier.name}. Motivo: {reason}"
             )
 
+        # Anular deuda asociada si existe
+        if hasattr(self, 'debt'):
+            self.debt.is_cancelled = True
+            self.debt.save(update_fields=['is_cancelled', 'updated_at'])
+            for pay in self.debt.payments.all():
+                if hasattr(pay, 'financial_movement'):
+                    pay.financial_movement.is_cancelled = True
+                    pay.financial_movement.save(update_fields=['is_cancelled'])
+
+        # Anular movimiento financiero asociado si existe (compra de contado)
+        if hasattr(self, 'financial_movement'):
+            self.financial_movement.is_cancelled = True
+            self.financial_movement.save(update_fields=['is_cancelled'])
+
 
 class PurchaseItem(models.Model):
     """
@@ -208,3 +223,160 @@ class PurchaseItem(models.Model):
     def save(self, *args, **kwargs):
         self.subtotal = self.unit_cost * self.quantity
         super().save(*args, **kwargs)
+
+
+class SupplierDebt(models.Model):
+    """
+    Cuenta por pagar asociada a una compra a crédito o pago parcial con un proveedor.
+    """
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.PROTECT,
+        related_name='debts',
+        verbose_name='Proveedor'
+    )
+    purchase = models.OneToOneField(
+        Purchase,
+        on_delete=models.CASCADE,
+        related_name='debt',
+        verbose_name='Compra Asociada'
+    )
+    total_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        verbose_name='Monto Total'
+    )
+    paid_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Total Pagado'
+    )
+    pending_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Saldo Pendiente'
+    )
+    due_date = models.DateField(null=True, blank=True, verbose_name='Fecha de Vencimiento')
+    is_paid = models.BooleanField(default=False, verbose_name='Saldada')
+    is_cancelled = models.BooleanField(default=False, verbose_name='Anulada')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Última Actualización')
+
+    class Meta:
+        verbose_name = 'Cuenta por Pagar'
+        verbose_name_plural = 'Cuentas por Pagar'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Por Pagar #{self.purchase.invoice_number} - {self.supplier.name} (Saldo: ${self.pending_balance})"
+
+    @property
+    def is_overdue(self):
+        if self.is_paid or self.is_cancelled or not self.due_date:
+            return False
+        return self.due_date < timezone.localdate()
+
+    @transaction.atomic
+    def register_payment(self, amount, payment_method, user, reference="", notes=""):
+        """
+        Registra un abono / pago realizado al proveedor de forma atómica.
+        """
+        if self.is_cancelled:
+            raise ValueError("No se pueden registrar pagos sobre una deuda anulada.")
+        if self.is_paid or self.pending_balance <= Decimal('0.00'):
+            raise ValueError("Esta cuenta por pagar ya ha sido saldada.")
+
+        amount = Decimal(str(amount))
+        if amount <= Decimal('0.00'):
+            raise ValueError("El valor del pago debe ser mayor a cero.")
+        if amount > self.pending_balance:
+            raise ValueError(
+                f"El pago (${amount:,.2f}) supera el saldo pendiente (${self.pending_balance:,.2f})."
+            )
+
+        payment = SupplierPayment.objects.create(
+            debt=self,
+            amount=amount,
+            payment_method=payment_method,
+            reference=reference,
+            user=user,
+            notes=notes
+        )
+
+        self.paid_amount += amount
+        self.pending_balance -= amount
+        if self.pending_balance <= Decimal('0.00'):
+            self.pending_balance = Decimal('0.00')
+            self.is_paid = True
+        self.save(update_fields=['paid_amount', 'pending_balance', 'is_paid', 'updated_at'])
+
+        # Registrar egreso financiero por el pago al proveedor
+        from finance.models import FinancialCategory, FinancialMovement
+        category = FinancialCategory.get_or_create_system_category(
+            'Pagos a Proveedores', FinancialCategory.TYPE_EXPENSE
+        )
+        FinancialMovement.objects.create(
+            movement_type=FinancialMovement.TYPE_EXPENSE,
+            category=category,
+            description=f"Pago a {self.supplier.name} - Compra #{self.purchase.invoice_number}",
+            amount=amount,
+            payment_method=payment_method,
+            user=user,
+            notes=notes,
+            supplier_payment=payment,
+        )
+
+        return payment
+
+
+class SupplierPayment(models.Model):
+    """
+    Registro individual de pago/abono realizado a un proveedor.
+    """
+    PAYMENT_CASH = 'cash'
+    PAYMENT_TRANSFER = 'transfer'
+
+    PAYMENT_METHOD_CHOICES = [
+        (PAYMENT_CASH, 'Efectivo'),
+        (PAYMENT_TRANSFER, 'Transferencia Bancaria'),
+    ]
+
+    debt = models.ForeignKey(
+        SupplierDebt,
+        on_delete=models.CASCADE,
+        related_name='payments',
+        verbose_name='Cuenta por Pagar'
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        verbose_name='Valor Pagado'
+    )
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD_CHOICES,
+        default=PAYMENT_CASH,
+        verbose_name='Método de Pago'
+    )
+    reference = models.CharField(max_length=100, blank=True, verbose_name='Referencia / Comprobante')
+    date = models.DateTimeField(auto_now_add=True, verbose_name='Fecha y Hora')
+    user = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='supplier_payments_made',
+        verbose_name='Usuario Responsable'
+    )
+    notes = models.TextField(blank=True, verbose_name='Observaciones')
+
+    class Meta:
+        verbose_name = 'Pago a Proveedor'
+        verbose_name_plural = 'Pagos a Proveedores'
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"Pago ${self.amount} - {self.debt.supplier.name} ({self.date.strftime('%d/%m/%Y')})"

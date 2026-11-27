@@ -95,6 +95,55 @@ def pos_view(request):
                 sale.total = max(Decimal('0.00'), subtotal_calc - discount)
                 sale.save(update_fields=['subtotal', 'total'])
 
+                # Auto-crear cuenta por cobrar para ventas a crédito o pago parcial
+                if payment_method in [Sale.PAYMENT_CREDIT, Sale.PAYMENT_PARTIAL]:
+                    if not customer:
+                        raise ValueError('Para ventas a crédito o pago parcial debe seleccionar un cliente registrado.')
+
+                    from customers.models import CustomerDebt, CustomerPayment
+                    initial_payment = Decimal(str(request.POST.get('initial_payment', '0') or '0'))
+                    if initial_payment < Decimal('0.00'):
+                        initial_payment = Decimal('0.00')
+                    if initial_payment > sale.total:
+                        raise ValueError('El abono inicial no puede ser mayor al total de la venta.')
+
+                    debt = CustomerDebt.objects.create(
+                        customer=customer,
+                        sale=sale,
+                        total_amount=sale.total,
+                        paid_amount=Decimal('0.00'),
+                        pending_balance=sale.total,
+                    )
+                    if payment_method == Sale.PAYMENT_PARTIAL and initial_payment > Decimal('0.00'):
+                        debt.register_payment(
+                            amount=initial_payment,
+                            payment_method=CustomerPayment.PAYMENT_CASH,
+                            user=request.user,
+                            notes=f'Abono inicial en POS - Factura #{sale.invoice_number}',
+                        )
+
+                # Registrar movimiento financiero solo si entra dinero (contado/transferencia).
+                # Si es crédito, se registra al momento de recibir abonos; si es parcial, register_payment ya lo registra.
+                if payment_method in [Sale.PAYMENT_CASH, Sale.PAYMENT_TRANSFER] and sale.total > Decimal('0.00'):
+                    from finance.models import FinancialCategory, FinancialMovement
+                    category = FinancialCategory.get_or_create_system_category(
+                        'Ventas de Contado', FinancialCategory.TYPE_INCOME
+                    )
+                    fin_method = (
+                        FinancialMovement.PAYMENT_TRANSFER
+                        if payment_method == Sale.PAYMENT_TRANSFER
+                        else FinancialMovement.PAYMENT_CASH
+                    )
+                    FinancialMovement.objects.create(
+                        movement_type=FinancialMovement.TYPE_INCOME,
+                        category=category,
+                        description=f"Venta Factura #{sale.invoice_number}" + (f" - {customer.name}" if customer else ""),
+                        amount=sale.total,
+                        payment_method=fin_method,
+                        user=request.user,
+                        sale=sale,
+                    )
+
                 messages.success(request, f'¡Venta #{sale.invoice_number} registrada exitosamente por ${sale.total:,.2f}!')
                 return redirect('sales:sale_detail', pk=sale.pk)
 
